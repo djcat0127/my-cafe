@@ -20,28 +20,22 @@ export default function Home() {
   const [newTodo, setNewTodo] = useState("");
   const [showInfo, setShowInfo] = useState(false);
 
-  // 각 소리마다 별도의 오디오 객체를 미리 만들어둠
-  const audios = useRef<Record<string, HTMLAudioElement>>({});
-
-  useEffect(() => {
-    // 미리 오디오 객체 생성 및 설정
-    CONCEPTS.forEach(c => {
-      const audio = new Audio(c.sound);
-      audio.loop = true;
-      audio.preload = "auto";
-      audios.current[c.id] = audio;
-    });
-  }, []);
+  // 오디오 객체를 미리 할당
+  const audioFocus = useRef<HTMLAudioElement | null>(null);
+  const audioSocial = useRef<HTMLAudioElement | null>(null);
+  const audioWindow = useRef<HTMLAudioElement | null>(null);
 
   const handleStart = async () => {
-    // [핵심] 시작 버튼을 누를 때 모든 소리를 0.1초씩 재생해서 브라우저 권한을 얻음 (예열)
-    for (const key in audios.current) {
-      const audio = audios.current[key];
-      audio.play().then(() => {
-        audio.pause(); // 바로 정지
-        audio.currentTime = 0;
-      }).catch(() => console.log("Sound pre-unlock failed"));
-    }
+    // 시작 버튼을 누를 때 모든 오디오를 초기화 및 '해제'
+    const a1 = new Audio(CONCEPTS[0].sound); a1.loop = true; audioFocus.current = a1;
+    const a2 = new Audio(CONCEPTS[1].sound); a2.loop = true; audioSocial.current = a2;
+    const a3 = new Audio(CONCEPTS[2].sound); a3.loop = true; audioWindow.current = a3;
+
+    // 브라우저 권한 획득을 위해 아주 잠깐 재생 후 정지
+    [a1, a2, a3].forEach(a => {
+      a.play().then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
+    });
+    
     setHasStarted(true);
   };
 
@@ -51,49 +45,39 @@ export default function Home() {
       interval = setInterval(() => setTimeLeft(t => t - 1), 1000);
     } else if (timeLeft === 0) {
       setIsActive(false);
-      handleCycle();
+      const isWork = mode === 'WORK';
+      const nextMode = isWork ? (session < 4 ? 'REST' : 'LONG_REST') : 'WORK';
+      if (isWork) setSession(s => s < 4 ? s + 1 : 1);
+      setMode(nextMode);
+      setTimeLeft(nextMode === 'WORK' ? 25 * 60 : (nextMode === 'REST' ? 5 * 60 : 20 * 60));
+      alert(isWork ? "Focus done! Time to rest." : "Rest over! Back to work.");
     }
     return () => clearInterval(interval);
-  }, [isActive, timeLeft]);
+  }, [isActive, timeLeft, mode, session]);
 
-  const handleCycle = () => {
-    if (mode === 'WORK') {
-      if (session < 4) { setMode('REST'); setTimeLeft(5 * 60); }
-      else { setMode('LONG_REST'); setTimeLeft(20 * 60); }
-      setSession(prev => prev < 4 ? prev + 1 : 1);
-    } else {
-      setMode('WORK'); setTimeLeft(25 * 60);
-    }
-  };
+  const toggleSound = (id: string) => {
+    // 모든 소리 끄기
+    [audioFocus, audioSocial, audioWindow].forEach(ref => ref.current?.pause());
 
-  const toggleSound = (type: string) => {
-    // 모든 소리 일시정지
-    Object.values(audios.current).forEach(a => a.pause());
-
-    if (currentSound === type) {
+    if (currentSound === id) {
       setCurrentSound(null);
     } else {
-      const target = audios.current[type];
-      if (target) {
-        target.play();
-        setCurrentSound(type);
-      }
+      const target = id === 'focus' ? audioFocus : id === 'social' ? audioSocial : audioWindow;
+      target.current?.play().catch(() => alert("소리 재생에 실패했습니다. 다시 클릭해주세요."));
+      setCurrentSound(id);
     }
   };
 
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    return `${m}:${String(s % 60).padStart(2, '0')}`;
-  };
+  const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
   if (!hasStarted) {
     return (
-      <div onClick={handleStart} style={{ backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-        <div style={{ padding: '40px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '100px', marginBottom: '30px' }}>
-            <Play size={60} fill="white" />
+      <div onClick={handleStart} style={{ backgroundColor: '#000', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', textAlign: 'center', padding: '20px' }}>
+        <div style={{ padding: '30px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', marginBottom: '20px' }}>
+          <Play size={40} fill="white" />
         </div>
-        <h1 style={{ fontSize: '20px', fontWeight: 200, letterSpacing: '8px' }}>START CONCENTRATION</h1>
-        <p style={{ marginTop: '20px', fontSize: '11px', opacity: 0.3, letterSpacing: '2px' }}>클릭하여 소리와 타이머를 활성화하세요</p>
+        <h1 style={{ fontSize: '20px', letterSpacing: '10px', fontWeight: 200 }}>OPEN CAFE</h1>
+        <p style={{ marginTop: '10px', opacity: 0.3, fontSize: '12px' }}>화면을 클릭하면 소리와 타이머가 활성화됩니다</p>
       </div>
     );
   }
@@ -102,25 +86,26 @@ export default function Home() {
     <div style={{
       backgroundColor: '#0a0a0a', color: '#f5f5f5', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', position: 'relative',
       backgroundImage: `linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url(${CONCEPTS[conceptIdx].bg})`,
-      backgroundSize: 'cover', backgroundPosition: 'center', transition: 'all 1s ease'
+      backgroundSize: 'cover', backgroundPosition: 'center', transition: '1s ease'
     }}>
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(255, 255, 255, 0.05)', height: `${(1 - timeLeft / (mode === 'WORK' ? 25*60 : (mode === 'REST' ? 5*60 : 20*60))) * 100}%`, transition: 'height 1s linear', zIndex: 1 }} />
+      {/* 뽀모도로 진행 상태 바 */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(255,255,255,0.05)', height: `${(1 - timeLeft / (mode === 'WORK' ? 25*60 : (mode === 'REST' ? 5*60 : 20*60))) * 100}%`, transition: 'height 1s linear' }} />
 
       <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'row', gap: '40px', maxWidth: '1100px', width: '90%' }} className="main-container">
         
+        {/* 타이머 구역 */}
         <div style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(40px)', padding: '60px 40px', borderRadius: '60px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 50px 100px rgba(0,0,0,0.5)' }}>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
             {[1, 2, 3, 4].map(i => (
-              <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: i <= session ? '#f97316' : 'rgba(255,255,255,0.1)', transition: '0.5s' }} />
+              <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: i <= session ? '#f97316' : 'rgba(255,255,255,0.1)' }} />
             ))}
           </div>
-
           <div style={{ fontSize: '10px', letterSpacing: '5px', opacity: 0.4, marginBottom: '10px', fontWeight: 'bold' }}>{mode} {session}/4</div>
-          <div style={{ fontSize: '160px', fontWeight: 100, marginBottom: '40px', letterSpacing: '-10px', lineHeight: 1 }}>{formatTime(timeLeft)}</div>
+          <div style={{ fontSize: '150px', fontWeight: 100, marginBottom: '40px', letterSpacing: '-10px', lineHeight: 1 }}>{formatTime(timeLeft)}</div>
           
           <div style={{ display: 'flex', gap: '30px', alignItems: 'center', marginBottom: '60px' }}>
             <button onClick={() => {setTimeLeft(25*60); setIsActive(false);}} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer' }}><RotateCcw size={28}/></button>
-            <button onClick={() => setIsActive(!isActive)} style={{ width: '90px', height: '90px', borderRadius: '50%', backgroundColor: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.3s shadow' }}>
+            <button onClick={() => setIsActive(!isActive)} style={{ width: '90px', height: '90px', borderRadius: '50%', backgroundColor: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
               {isActive ? <Pause size={40} color="#000" fill="#000"/> : <Play size={40} color="#000" fill="#000" style={{ marginLeft: '5px' }}/>}
             </button>
             <button onClick={() => setShowInfo(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer' }}><Info size={28}/></button>
@@ -141,23 +126,24 @@ export default function Home() {
           </div>
         </div>
 
+        {/* 플래너 구역 */}
         <div style={{ width: '380px', backgroundColor: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(40px)', padding: '40px', borderRadius: '60px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '20px', opacity: 0.6 }}>
             <ListTodo color="#f97316" size={20} />
-            <span style={{ fontSize: '18px', fontWeight: 300, letterSpacing: '1px' }}>PLANNER</span>
+            <span style={{ fontSize: '18px', fontWeight: 300 }}>PLANNER</span>
           </div>
           <form onSubmit={(e:any) => { e.preventDefault(); if(!newTodo) return; setTodos([{id: Date.now(), text: newTodo, done: false}, ...todos]); setNewTodo(""); }} style={{ display: 'flex', gap: '10px', marginBottom: '25px' }}>
-            <input value={newTodo} onChange={(e) => setNewTodo(e.target.value)} placeholder="Task..." style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '18px', color: '#fff', outline: 'none' }} />
-            <button style={{ width: '55px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', fontWeight: 'bold' }}>+</button>
+            <input value={newTodo} onChange={(e) => setNewTodo(e.target.value)} placeholder="Add task..." style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '15px', color: '#fff', outline: 'none' }} />
+            <button style={{ width: '50px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', fontWeight: 'bold' }}>+</button>
           </form>
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {todos.map(todo => (
-              <div key={todo.id} style={{ display: 'flex', alignItems: 'center', gap: '15px', backgroundColor: 'rgba(255,255,255,0.03)', padding: '20px', borderRadius: '25px', marginBottom: '12px' }}>
+              <div key={todo.id} style={{ display: 'flex', alignItems: 'center', gap: '15px', backgroundColor: 'rgba(255,255,255,0.03)', padding: '18px', borderRadius: '25px', marginBottom: '10px' }}>
                 <button onClick={() => setTodos(todos.map(t => t.id === todo.id ? {...t, done: !t.done} : t))} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                   <CheckCircle2 size={20} color={todo.done ? "#f97316" : "rgba(255,255,255,0.1)"} />
                 </button>
                 <span style={{ fontSize: '14px', flex: 1, textDecoration: todo.done ? 'line-through' : 'none', opacity: todo.done ? 0.3 : 0.8 }}>{todo.text}</span>
-                <button onClick={() => setTodos(todos.filter(t => t.id !== todo.id))} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.1)', cursor: 'pointer' }}><Trash2 size={16}/></button>
+                <button onClick={() => setTodos(todos.filter(t => t.id !== todo.id))} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.1)' }}><Trash2 size={16}/></button>
               </div>
             ))}
           </div>
@@ -165,15 +151,14 @@ export default function Home() {
       </div>
 
       {showInfo && (
-        <div style={{ position: 'absolute', zIndex: 100, backgroundColor: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(30px)', padding: '40px', borderRadius: '40px', border: '1px solid rgba(255,255,255,0.2)', maxWidth: '350px', textAlign: 'center' }}>
-          <h3 style={{ color: '#f97316', marginBottom: '20px' }}>POMODORO GUIDE</h3>
-          <p style={{ fontSize: '13px', lineHeight: '1.8', opacity: 0.7, textAlign: 'left' }}>
-            25분 집중과 5분 휴식을 반복합니다.<br/>
-            4번의 집중 세션이 끝나면 20분의 긴 휴식이 시작됩니다.<br/><br/>
-            <strong>{CONCEPTS[conceptIdx].name} MODE:</strong><br/>
-            {CONCEPTS[conceptIdx].desc}
+        <div style={{ position: 'absolute', zIndex: 100, backgroundColor: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(30px)', padding: '40px', borderRadius: '40px', border: '1px solid rgba(255,255,255,0.2)', maxWidth: '350px' }}>
+          <h3 style={{ color: '#f97316', marginBottom: '20px' }}>뽀모도로 가이드</h3>
+          <p style={{ fontSize: '13px', lineHeight: '1.8', opacity: 0.7 }}>
+            • <strong>FOCUS:</strong> 25분 집중 시간입니다.<br/>
+            • <strong>REST:</strong> 5분(짧게) 혹은 20분(길게) 휴식합니다.<br/>
+            • <strong>세션:</strong> 4회 집중 후엔 자동으로 긴 휴식이 시작됩니다.
           </p>
-          <button onClick={() => setShowInfo(false)} style={{ marginTop: '30px', padding: '12px 40px', borderRadius: '25px', border: 'none', backgroundColor: '#fff', fontWeight: 'bold' }}>GOT IT</button>
+          <button onClick={() => setShowInfo(false)} style={{ marginTop: '30px', padding: '10px 30px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}>알겠습니다</button>
         </div>
       )}
 
