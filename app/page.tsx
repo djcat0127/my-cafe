@@ -1,153 +1,176 @@
 "use client";
 import { useEffect, useState, useRef } from 'react';
-import { Play, Pause, RotateCcw, Coffee, CloudRain, ListTodo, CheckCircle2, Trash2, Volume2, AlertCircle } from 'lucide-react';
+import { Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Info, Coffee, Users, Map, CheckCircle2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// --- 컨셉 데이터 설정 ---
+const CONCEPTS = [
+  {
+    id: 'focus',
+    name: 'FOCUS',
+    bg: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=2070',
+    sound: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3', // 집중용 차분한 소리
+    desc: '오직 작업에만 몰입하는 시간입니다.'
+  },
+  {
+    id: 'social',
+    name: 'SOCIAL',
+    bg: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=2047',
+    sound: 'https://www.soundjay.com/misc/sounds/coffee-shop-1.mp3', // 카페 소음
+    desc: '사람들과 함께 있는 듯한 적당한 소음이 집중력을 높여줍니다.'
+  },
+  {
+    id: 'window',
+    name: 'WINDOW',
+    bg: 'https://images.unsplash.com/photo-1519608487953-e999c86e7455?q=80&w=2070',
+    sound: 'https://www.soundjay.com/nature/sounds/rain-01.mp3', // 풍경/빗소리
+    desc: '창밖 풍경을 보며 여유롭게 집중해보세요.'
+  }
+];
 
 export default function Home() {
+  const [conceptIdx, setConceptIdx] = useState(0);
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState('FOCUS');
-  const [sessionCount, setSessionCount] = useState(1);
-  const [currentSound, setCurrentSound] = useState<string | null>(null);
-  const [todos, setTodos] = useState<{id: number, text: string, done: boolean}[]>([]);
-  const [newTodo, setNewTodo] = useState("");
-  const [showSoundError, setShowSoundError] = useState(false);
+  const [session, setSession] = useState(1);
+  const [showInfo, setShowInfo] = useState(false);
   
-  const cafeAudio = useRef<HTMLAudioElement | null>(null);
-  const rainAudio = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // 컨셉 변경 시 소리 업데이트
   useEffect(() => {
-    // 가장 확실하게 재생되는 고음질 MP3 주소로 교체
-    cafeAudio.current = new Audio("https://www.soundjay.com/misc/sounds/coffee-shop-1.mp3");
-    rainAudio.current = new Audio("https://www.soundjay.com/nature/sounds/rain-01.mp3");
-    cafeAudio.current.loop = true;
-    rainAudio.current.loop = true;
-  }, []);
+    if (audioRef.current) {
+      audioRef.current.src = CONCEPTS[conceptIdx].sound;
+      audioRef.current.loop = true;
+      if (isActive) audioRef.current.play();
+    }
+  }, [conceptIdx]);
 
+  // 타이머 로직
   useEffect(() => {
     let interval: any;
-    if (isActive && timeLeft > 0) {
-      interval = setInterval(() => setTimeLeft(t => t - 1), 1000);
-    } else if (timeLeft === 0) {
-      setIsActive(false);
-      const nextMode = mode === 'FOCUS' ? (sessionCount < 4 ? 'REST' : 'LONG_REST') : 'FOCUS';
-      if (mode === 'FOCUS') setSessionCount(prev => prev < 4 ? prev + 1 : 1);
-      setMode(nextMode);
-      setTimeLeft(nextMode === 'FOCUS' ? 25 * 60 : (nextMode === 'REST' ? 5 * 60 : 20 * 60));
+    if (isActive) {
+      if (audioRef.current?.paused) audioRef.current.play().catch(() => {});
+      interval = setInterval(() => {
+        setTimeLeft(t => {
+          if (t <= 1) {
+            handleCycleEnd();
+            return 0;
+          }
+          return t - 1;
+        });
+      }, 1000);
+    } else {
+      audioRef.current?.pause();
+      clearInterval(interval);
     }
     return () => clearInterval(interval);
-  }, [isActive, timeLeft]);
+  }, [isActive]);
 
-  const toggleSound = async (type: string) => {
-    try {
-      cafeAudio.current?.pause();
-      rainAudio.current?.pause();
-
-      if (currentSound === type) {
-        setCurrentSound(null);
-      } else {
-        const target = type === 'cafe' ? cafeAudio.current : rainAudio.current;
-        if (target) {
-          await target.play();
-          setCurrentSound(type);
-          setShowSoundError(false);
-        }
-      }
-    } catch (err) {
-      // 소리 재생 실패 시 (브라우저 차단 등) 에러 메시지 표시
-      setShowSoundError(true);
-      setTimeout(() => setShowSoundError(false), 5000);
+  const handleCycleEnd = () => {
+    setIsActive(false);
+    if (mode === 'FOCUS') {
+      const nextSession = session < 4 ? session + 1 : 1;
+      setSession(nextSession);
+      setMode('REST');
+      setTimeLeft(session === 4 ? 20 * 60 : 5 * 60);
+    } else {
+      setMode('FOCUS');
+      setTimeLeft(25 * 60);
     }
   };
 
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    return `${m}:${String(s % 60).padStart(2, '0')}`;
-  };
+  const nextConcept = () => setConceptIdx((prev) => (prev + 1) % CONCEPTS.length);
+  const prevConcept = () => setConceptIdx((prev) => (prev - 1 + CONCEPTS.length) % CONCEPTS.length);
 
   return (
-    <div style={{
-      backgroundColor: '#0a0a0a', color: '#f5f5f5', minHeight: '100vh',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: 'sans-serif', position: 'relative',
-      backgroundImage: `linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url('https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?q=80&w=2078')`,
-      backgroundSize: 'cover', backgroundPosition: 'center'
-    }}>
-      {/* 1. 소리 재생 실패 시 안내창 */}
-      {showSoundError && (
-        <div style={{ position: 'fixed', top: '20px', backgroundColor: '#f97316', color: '#fff', padding: '15px 25px', borderRadius: '15px', zIndex: 100, display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
-          <AlertCircle size={20} />
-          <span>화면을 한 번 클릭한 후 다시 소리를 켜주세요!</span>
+    <main className="relative h-screen w-full flex items-center justify-center bg-black overflow-hidden font-sans">
+      {/* 1. 배경 (애니메이션 전환) */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={conceptIdx}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          transition={{ duration: 1 }}
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url(${CONCEPTS[conceptIdx].bg})` }}
+        />
+      </AnimatePresence>
+
+      <audio ref={audioRef} />
+
+      {/* 2. 컨셉 네비게이션 (상단) */}
+      <div className="absolute top-10 flex items-center gap-6 z-20">
+        <button onClick={prevConcept} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"><ChevronLeft color="white"/></button>
+        <div className="px-6 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-white tracking-[0.3em] text-xs font-bold">
+          {CONCEPTS[conceptIdx].name}
         </div>
-      )}
+        <button onClick={nextConcept} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition"><ChevronRight color="white"/></button>
+      </div>
 
-      {/* 2. 타이머 차오르는 효과 */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        backgroundColor: mode === 'FOCUS' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-        height: `${(1 - timeLeft / (mode === 'FOCUS' ? 25*60 : (mode === 'REST' ? 5*60 : 20*60))) * 100}%`,
-        transition: 'height 1s linear', zIndex: 1
-      }} />
+      {/* 3. 기법 설명 버튼 (좌측 상단) */}
+      <button 
+        onClick={() => setShowInfo(!showInfo)}
+        className="absolute top-10 left-10 z-30 p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-white hover:bg-white/20 transition"
+      >
+        <Info size={20} />
+      </button>
 
-      <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'row', gap: '40px', maxWidth: '1100px', width: '90%' }} className="main-container">
-        
-        {/* [왼쪽] 타이머 섹션 */}
-        <div style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(30px)', padding: '60px 40px', borderRadius: '50px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: i <= sessionCount ? '#f97316' : 'rgba(255,255,255,0.1)', boxShadow: i === sessionCount ? '0 0 15px #f97316' : 'none' }} />
-            ))}
+      {/* 기법 설명 팝업 */}
+      <AnimatePresence>
+        {showInfo && (
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+            className="absolute top-24 left-10 z-30 w-72 bg-black/60 backdrop-blur-2xl p-6 rounded-[2rem] border border-white/10 text-white text-sm leading-relaxed"
+          >
+            <h3 className="font-bold mb-3 text-orange-400">💡 뽀모도로 기법이란?</h3>
+            <p className="mb-2 opacity-80">• <span className="text-white font-bold">집중 세션:</span> 25분간 한 가지 일에만 몰입합니다.</p>
+            <p className="mb-2 opacity-80">• <span className="text-white font-bold">자동 휴식:</span> 집중이 끝나면 5분간 뇌를 식힙니다.</p>
+            <p className="opacity-80">• <span className="text-white font-bold">4회 반복:</span> 4번의 집중 후엔 20분간 긴 휴식을 취합니다.</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 4. 메인 타이머 (중앙) */}
+      <div className="z-10 flex flex-col items-center">
+        {/* 커피 컵 애니메이션 (중앙 오브제) */}
+        <motion.div 
+          animate={{ y: [0, -10, 0] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          className="mb-8 w-40 h-40 flex items-center justify-center bg-white/5 backdrop-blur-3xl rounded-full border border-white/10 shadow-2xl"
+        >
+          {conceptIdx === 0 && <Coffee size={60} color="white" strokeWidth={1} />}
+          {conceptIdx === 1 && <Users size={60} color="white" strokeWidth={1} />}
+          {conceptIdx === 2 && <Map size={60} color="white" strokeWidth={1} />}
+        </motion.div>
+
+        <div className="text-center">
+          <div className="text-[10rem] md:text-[14rem] font-thin text-white leading-none tracking-tighter tabular-nums mb-8">
+            {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
           </div>
-          <div style={{ fontSize: '12px', letterSpacing: '6px', opacity: 0.5, marginBottom: '10px', fontWeight: 'bold' }}>{mode} {sessionCount}/4</div>
-          <div style={{ fontSize: '150px', fontWeight: 100, marginBottom: '40px', letterSpacing: '-8px', lineHeight: 1 }}>{formatTime(timeLeft)}</div>
           
-          <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
-            <button onClick={() => {setTimeLeft(25*60); setIsActive(false); setSessionCount(1);}} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer', outline: 'none' }}><RotateCcw size={28}/></button>
-            <button onClick={() => setIsActive(!isActive)} style={{ width: '90px', height: '90px', borderRadius: '50%', backgroundColor: isActive ? '#f97316' : '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.3s' }}>
-              {isActive ? <Pause size={36} color="#fff" fill="#fff"/> : <Play size={36} color="#000" fill="#000" style={{ marginLeft: '5px' }}/>}
+          <div className="flex items-center justify-center gap-10">
+            <button onClick={() => {setTimeLeft(25*60); setIsActive(false);}} className="text-white/20 hover:text-white transition"><RotateCcw size={32}/></button>
+            <button 
+              onClick={() => setIsActive(!isActive)}
+              className="w-24 h-24 bg-white rounded-full flex items-center justify-center hover:scale-110 transition shadow-2xl"
+            >
+              {isActive ? <Pause size={40} color="black" fill="black" /> : <Play size={40} color="black" fill="black" className="ml-1" />}
             </button>
-            <div style={{ width: '28px' }} />
-          </div>
-
-          <div style={{ marginTop: '50px', display: 'flex', gap: '20px' }}>
-            <button onClick={() => toggleSound('cafe')} style={{ padding: '20px', borderRadius: '25px', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', backgroundColor: currentSound === 'cafe' ? '#f97316' : 'rgba(255,255,255,0.05)', color: '#fff', transition: '0.3s' }}>
-              <Coffee size={24} />
-            </button>
-            <button onClick={() => toggleSound('rain')} style={{ padding: '20px', borderRadius: '25px', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', backgroundColor: currentSound === 'rain' ? '#f97316' : 'rgba(255,255,255,0.05)', color: '#fff', transition: '0.3s' }}>
-              <CloudRain size={24} />
-            </button>
-          </div>
-        </div>
-
-        {/* [오른쪽] 할 일 목록 */}
-        <div style={{ width: '350px', backgroundColor: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(30px)', padding: '40px', borderRadius: '50px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '20px' }}>
-            <ListTodo color="#f97316" size={20} />
-            <span style={{ fontSize: '18px', fontWeight: 300 }}>TODAY'S PLAN</span>
-          </div>
-
-          <form onSubmit={(e:any) => {
-            e.preventDefault();
-            if(!newTodo) return;
-            setTodos([{id: Date.now(), text: newTodo, done: false}, ...todos]);
-            setNewTodo("");
-          }} style={{ display: 'flex', gap: '10px', marginBottom: '25px' }}>
-            <input value={newTodo} onChange={(e) => setNewTodo(e.target.value)} placeholder="Task..." style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '15px', padding: '15px', color: '#fff', outline: 'none' }} />
-            <button style={{ width: '50px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>+</button>
-          </form>
-
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            {todos.map(todo => (
-              <div key={todo.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '18px', borderRadius: '20px', marginBottom: '12px' }}>
-                <button onClick={() => setTodos(todos.map(t => t.id === todo.id ? {...t, done: !t.done} : t))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                  <CheckCircle2 size={20} color={todo.done ? "#f97316" : "rgba(255,255,255,0.1)"} />
-                </button>
-                <span style={{ fontSize: '14px', flex: 1, textDecoration: todo.done ? 'line-through' : 'none', opacity: todo.done ? 0.3 : 0.8 }}>{todo.text}</span>
-                <button onClick={() => setTodos(todos.filter(t => t.id !== todo.id))} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer' }}><Trash2 size={16}/></button>
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] text-white/40 font-bold mb-1">{session}/4 SESSION</span>
+              <div className="flex gap-1">
+                {[1,2,3,4].map(i => <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= session ? 'bg-orange-500' : 'bg-white/10'}`} />)}
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* 5. 하단 캡션 */}
+      <div className="absolute bottom-10 text-white/30 text-[10px] tracking-[0.5em] uppercase font-light">
+        {CONCEPTS[conceptIdx].desc}
+      </div>
+    </main>
   );
 }
