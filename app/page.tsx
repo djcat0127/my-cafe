@@ -20,7 +20,7 @@ export default function Home() {
   useEffect(() => {
     // 가장 소리가 잘 났던 구글 안정 링크들
     audioFocus.current = new Audio("https://actions.google.com/sounds/v1/ambiences/coffee_shop.ogg");
-    audioSocial.current = new Audio("https://actions.google.com/sounds/v1/crowds/crowd_outdoor_party.ogg");
+    audioSocial.current = new Audio("https://actions.google.com/sounds/v1/crowds/crowd_talking.ogg");
     audioWindow.current = new Audio("https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg");
     
     [audioFocus, audioSocial, audioWindow].forEach(ref => {
