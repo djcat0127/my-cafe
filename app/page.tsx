@@ -1,25 +1,24 @@
 "use client";
 import { useEffect, useState, useRef } from 'react';
-import { Play, Pause, RotateCcw, Coffee, CloudRain, ListTodo, CheckCircle2, Trash2, ChevronLeft, ChevronRight, Info } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Play, Pause, RotateCcw, Coffee, CloudRain, ListTodo, CheckCircle2, Trash2, ChevronLeft, ChevronRight, Info, Users } from 'lucide-react';
 
 const CONCEPTS = [
   {
     id: 'focus', name: 'FOCUS',
     bg: 'https://images.unsplash.com/photo-1507133750040-4a8f57021571?q=80&w=2000',
-    sound: 'https://actions.google.com/sounds/v1/ambiences/coffee_shop.ogg',
+    sound: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3', // 차분한 집중음
     desc: '오직 작업에만 몰입하는 시간입니다.'
   },
   {
     id: 'social', name: 'SOCIAL',
     bg: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=2047',
-    sound: 'https://actions.google.com/sounds/v1/ambiences/inner_city_traffic.ogg',
-    desc: '백색 소음이 창의력을 자극합니다.'
+    sound: 'https://www.soundjay.com/misc/sounds/coffee-shop-1.mp3', // 확실히 검증된 카페 소음
+    desc: '사람들의 웅성거림이 창의력을 자극합니다.'
   },
   {
     id: 'window', name: 'WINDOW',
     bg: 'https://images.unsplash.com/photo-1519608487953-e999c86e7455?q=80&w=2070',
-    sound: 'https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg',
+    sound: 'https://www.soundjay.com/nature/sounds/rain-01.mp3', // 확실히 검증된 빗소리
     desc: '창밖 풍경과 함께 여유를 가지세요.'
   }
 ];
@@ -35,7 +34,6 @@ export default function Home() {
   const [newTodo, setNewTodo] = useState("");
   const [showInfo, setShowInfo] = useState(false);
   
-  // 오디오 객체를 하나만 생성해서 관리 (메모리 절약 및 성능 향상)
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -44,7 +42,6 @@ export default function Home() {
     return () => audioRef.current?.pause();
   }, []);
 
-  // 타이머 로직
   useEffect(() => {
     let interval: any;
     if (isActive && timeLeft > 0) {
@@ -62,28 +59,23 @@ export default function Home() {
       setSession(nextSession);
       setMode('REST');
       setTimeLeft(session === 4 ? 20 * 60 : 5 * 60);
+      alert("집중 완료! 휴식 시간입니다.");
     } else {
       setMode('FOCUS');
       setTimeLeft(25 * 60);
+      alert("휴식 끝! 다시 집중해볼까요?");
     }
   };
 
-  // 소리 재생 함수 (가장 중요)
   const toggleSound = (type: string) => {
     if (!audioRef.current) return;
-
     if (currentSound === type) {
       audioRef.current.pause();
       setCurrentSound(null);
     } else {
-      const soundUrl = CONCEPTS.find(c => c.id === type)?.sound;
-      if (soundUrl) {
-        audioRef.current.src = soundUrl;
-        audioRef.current.play().catch(() => {
-          alert("화면을 아무 곳이나 클릭한 후 다시 소리를 켜주세요!");
-        });
-        setCurrentSound(type);
-      }
+      audioRef.current.src = CONCEPTS.find(c => c.id === type)?.sound || "";
+      audioRef.current.play().catch(() => alert("화면을 클릭한 후 소리를 켜주세요!"));
+      setCurrentSound(type);
     }
   };
 
@@ -92,126 +84,98 @@ export default function Home() {
     return `${m}:${String(s % 60).padStart(2, '0')}`;
   };
 
-  return (
-    <main className="relative min-h-screen w-full flex items-center justify-center bg-black overflow-hidden font-sans text-white">
-      {/* 1. 배경 이미지 (테마 전환) */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={conceptIdx}
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          transition={{ duration: 1 }}
-          className="absolute inset-0 bg-cover bg-center shadow-inner"
-          style={{ backgroundImage: `linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url(${CONCEPTS[conceptIdx].bg})` }}
-        />
-      </AnimatePresence>
+  const containerStyle: any = {
+    backgroundColor: '#000', color: '#fff', minHeight: '100vh',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontFamily: 'sans-serif', position: 'relative', overflow: 'hidden',
+    backgroundImage: `linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0.75)), url(${CONCEPTS[conceptIdx].bg})`,
+    backgroundSize: 'cover', backgroundPosition: 'center', transition: 'background-image 1s ease-in-out'
+  };
 
-      {/* 2. 타이머 차오르는 효과 */}
+  return (
+    <div style={containerStyle}>
+      {/* 1. 커피 차오르는 효과 */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0,
-        backgroundColor: mode === 'FOCUS' ? 'rgba(249, 115, 22, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+        backgroundColor: mode === 'FOCUS' ? 'rgba(249, 115, 22, 0.2)' : 'rgba(59, 130, 246, 0.2)',
         height: `${(1 - timeLeft / (mode === 'FOCUS' ? 25*60 : (session === 4 ? 20*60 : 5*60))) * 100}%`,
         transition: 'height 1s linear', zIndex: 1
       }} />
 
-      <div className="relative z-10 w-full max-w-6xl px-6 flex flex-col lg:flex-row gap-12 items-center lg:items-stretch">
+      <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'row', gap: '40px', maxWidth: '1100px', width: '90%' }} className="main-box">
         
         {/* [왼쪽] 타이머 섹션 */}
-        <div className="flex-1 bg-black/30 backdrop-blur-3xl p-12 rounded-[4rem] border border-white/10 flex flex-col items-center justify-center shadow-2xl w-full">
-          {/* 세션 카운터 */}
-          <div className="flex gap-2 mb-6">
+        <div style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(30px)', padding: '60px 40px', borderRadius: '50px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 40px 100px rgba(0,0,0,0.5)' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className={`w-2.5 h-2.5 rounded-full transition-all ${i <= session ? 'bg-orange-500 shadow-[0_0_10px_#f97316]' : 'bg-white/10'}`} />
+              <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: i <= session ? '#f97316' : 'rgba(255,255,255,0.1)', boxShadow: i === session ? '0 0 10px #f97316' : 'none' }} />
             ))}
           </div>
 
-          <div className="text-[10px] tracking-[0.6em] opacity-40 mb-2 font-bold uppercase">{mode} {session}/4</div>
-          <h1 className="text-[10rem] lg:text-[13rem] font-thin leading-none tracking-tighter tabular-nums mb-12 drop-shadow-2xl">
-            {formatTime(timeLeft)}
-          </h1>
-
-          <div className="flex items-center gap-12 mb-12">
-            <button onClick={() => {setTimeLeft(25*60); setIsActive(false);}} className="text-white/20 hover:text-white transition-all"><RotateCcw size={32}/></button>
-            <button 
-              onClick={() => setIsActive(!isActive)}
-              className="w-28 h-28 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-2xl"
-            >
-              {isActive ? <Pause size={50} fill="black" /> : <Play size={50} fill="black" className="ml-2" />}
+          <div style={{ fontSize: '10px', letterSpacing: '5px', opacity: 0.5, marginBottom: '10px', fontWeight: 'bold' }}>{mode} {session}/4</div>
+          <div style={{ fontSize: '150px', fontWeight: 100, marginBottom: '40px', letterSpacing: '-10px', lineHeight: 1 }}>{formatTime(timeLeft)}</div>
+          
+          <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
+            <button onClick={() => {setTimeLeft(25*60); setIsActive(false); setSession(1);}} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer' }}><RotateCcw size={28}/></button>
+            <button onClick={() => setIsActive(!isActive)} style={{ width: '90px', height: '90px', borderRadius: '50%', backgroundColor: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 10px 30px rgba(255,255,255,0.2)' }}>
+              {isActive ? <Pause size={36} color="#000" fill="#000"/> : <Play size={36} color="#000" fill="#000" style={{ marginLeft: '5px' }}/>}
             </button>
-            <button onClick={() => setShowInfo(!showInfo)} className="text-white/20 hover:text-white transition-all"><Info size={32}/></button>
+            <button onClick={() => setShowInfo(!showInfo)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer' }}><Info size={28}/></button>
           </div>
 
-          {/* 컨셉 전환 버튼 */}
-          <div className="flex gap-4">
-            {CONCEPTS.map((concept, idx) => (
-              <button 
-                key={concept.id}
-                onClick={() => {setConceptIdx(idx); toggleSound(concept.id);}}
-                className={`flex flex-col items-center gap-2 p-5 rounded-[2.5rem] transition-all border ${currentSound === concept.id ? 'bg-white text-black border-white' : 'bg-white/5 text-white/40 border-white/10 hover:bg-white/10'}`}
-              >
-                {concept.id === 'focus' && <Coffee size={24} />}
-                {concept.id === 'social' && <Coffee size={24} strokeWidth={3} />}
-                {concept.id === 'window' && <CloudRain size={24} />}
-                <span className="text-[8px] font-bold tracking-widest">{concept.name}</span>
-              </button>
-            ))}
+          <div style={{ marginTop: '50px', display: 'flex', gap: '15px' }}>
+            <button onClick={() => {setConceptIdx(0); toggleSound('focus');}} style={{ padding: '20px', borderRadius: '25px', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', backgroundColor: currentSound === 'focus' ? '#fff' : 'rgba(255,255,255,0.05)', color: currentSound === 'focus' ? '#000' : '#fff' }}><Coffee size={24} /></button>
+            <button onClick={() => {setConceptIdx(1); toggleSound('social');}} style={{ padding: '20px', borderRadius: '25px', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', backgroundColor: currentSound === 'social' ? '#fff' : 'rgba(255,255,255,0.05)', color: currentSound === 'social' ? '#000' : '#fff' }}><Users size={24} /></button>
+            <button onClick={() => {setConceptIdx(2); toggleSound('window');}} style={{ padding: '20px', borderRadius: '25px', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', backgroundColor: currentSound === 'window' ? '#fff' : 'rgba(255,255,255,0.05)', color: currentSound === 'window' ? '#000' : '#fff' }}><CloudRain size={24} /></button>
           </div>
         </div>
 
-        {/* [오른쪽] 할 일 목록 */}
-        <div className="w-full lg:w-[400px] bg-black/30 backdrop-blur-3xl p-10 rounded-[4rem] border border-white/10 flex flex-col shadow-2xl">
-          <div className="flex items-center gap-3 mb-8 border-b border-white/10 pb-6">
-            <ListTodo size={20} className="text-orange-500" />
-            <h2 className="text-xl font-light tracking-wide italic">Today's Focus</h2>
+        {/* [오른쪽] 플래너 섹션 */}
+        <div style={{ width: '350px', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(30px)', padding: '40px', borderRadius: '50px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '20px' }}>
+            <ListTodo color="#f97316" size={20} />
+            <span style={{ fontSize: '18px', fontWeight: 300, letterSpacing: '1px' }}>PLANNER</span>
           </div>
 
-          <form onSubmit={(e:any) => { e.preventDefault(); if(!newTodo) return; setTodos([{id: Date.now(), text: newTodo, done: false}, ...todos]); setNewTodo(""); }} className="flex gap-3 mb-8">
-            <input 
-              value={newTodo} onChange={(e) => setNewTodo(e.target.value)}
-              placeholder="What to focus on?"
-              className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm outline-none focus:border-orange-500/50 transition-all"
-            />
-            <button className="bg-white text-black w-14 rounded-2xl font-black text-xl hover:bg-orange-100 transition-all">+</button>
+          <form onSubmit={(e:any) => { e.preventDefault(); if(!newTodo) return; setTodos([{id: Date.now(), text: newTodo, done: false}, ...todos]); setNewTodo(""); }} style={{ display: 'flex', gap: '10px', marginBottom: '25px' }}>
+            <input value={newTodo} onChange={(e) => setNewTodo(e.target.value)} placeholder="Add a task..." style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '15px', padding: '15px', color: '#fff', outline: 'none' }} />
+            <button style={{ width: '50px', borderRadius: '15px', border: 'none', backgroundColor: '#fff', fontWeight: 'bold' }}>+</button>
           </form>
 
-          <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scroll">
+          <div style={{ flex: 1, overflowY: 'auto' }}>
             {todos.map(todo => (
-              <div key={todo.id} className="flex items-center gap-4 bg-white/5 p-5 rounded-[2rem] border border-white/5 hover:bg-white/10 transition-all group">
-                <button onClick={() => setTodos(todos.map(t => t.id === todo.id ? {...t, done: !t.done} : t))}>
-                  <CheckCircle2 size={22} className={todo.done ? "text-orange-500" : "text-white/10"} />
+              <div key={todo.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '20px', marginBottom: '10px' }}>
+                <button onClick={() => setTodos(todos.map(t => t.id === todo.id ? {...t, done: !t.done} : t))} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                  <CheckCircle2 size={18} color={todo.done ? "#f97316" : "rgba(255,255,255,0.2)"} />
                 </button>
-                <span className={`flex-1 text-sm ${todo.done ? "line-through opacity-30" : "opacity-80"}`}>{todo.text}</span>
-                <button onClick={() => setTodos(todos.filter(t => t.id !== todo.id))} className="opacity-0 group-hover:opacity-40 hover:!opacity-100 transition-all">
-                  <Trash2 size={18} />
-                </button>
+                <span style={{ fontSize: '14px', flex: 1, textDecoration: todo.done ? 'line-through' : 'none', opacity: todo.done ? 0.3 : 0.8 }}>{todo.text}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* 기법 설명 모달 */}
-      <AnimatePresence>
-        {showInfo && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-            className="absolute z-50 bg-black/80 backdrop-blur-3xl p-10 rounded-[3rem] border border-white/20 max-w-sm text-center shadow-2xl"
-          >
-            <h3 className="text-xl font-bold mb-6 text-orange-500">뽀모도로 가이드</h3>
-            <div className="text-left space-y-4 text-sm opacity-80 leading-relaxed">
-              <p>• <strong>FOCUS:</strong> 25분 동안 오직 작업에만 몰입합니다.</p>
-              <p>• <strong>REST:</strong> 세션이 끝나면 5분간 휴식합니다.</p>
-              <p>• <strong>CYCLE:</strong> 4회 집중 후엔 20분의 긴 휴식을 가집니다.</p>
-              <p className="pt-4 text-[11px] text-center italic text-orange-300">"가장 효율적인 집중 리듬을 경험하세요."</p>
-            </div>
-            <button onClick={() => setShowInfo(false)} className="mt-8 px-8 py-3 bg-white text-black rounded-full font-bold text-xs uppercase tracking-widest">닫기</button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* 뽀모도로 가이드 모달 */}
+      {showInfo && (
+        <div style={{ position: 'absolute', zIndex: 100, backgroundColor: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.2)', maxWidth: '350px', textAlign: 'center' }}>
+          <h3 style={{ color: '#f97316', marginBottom: '20px' }}>뽀모도로 기법 가이드</h3>
+          <p style={{ fontSize: '14px', lineHeight: '1.6', opacity: 0.8, textAlign: 'left' }}>
+            • <strong>FOCUS:</strong> 25분간 한 업무에만 집중합니다.<br/>
+            • <strong>REST:</strong> 종료 후 5분간 휴식합니다.<br/>
+            • <strong>1/4 세션:</strong> 4회 반복 후 20분간 긴 휴식을 취합니다.<br/><br/>
+            현재 선택된 테마: <strong>{CONCEPTS[conceptIdx].name}</strong><br/>
+            {CONCEPTS[conceptIdx].desc}
+          </p>
+          <button onClick={() => setShowInfo(false)} style={{ marginTop: '30px', padding: '10px 30px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>닫기</button>
+        </div>
+      )}
 
       <style jsx global>{`
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        @media (max-width: 1000px) {
+          .main-box { flex-direction: column !important; align-items: center !important; }
+          .main-box > div { width: 100% !important; box-sizing: border-box; }
+        }
       `}</style>
-    </main>
+    </div>
   );
 }
