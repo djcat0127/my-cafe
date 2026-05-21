@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState, useRef } from 'react';
-import { Play, Pause, RotateCcw, Coffee, Users, CloudRain, ListTodo, CheckCircle2, Trash2, Info, X, Loader2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Coffee, Users, CloudRain, ListTodo, CheckCircle2, Trash2, Info, X, Volume2 } from 'lucide-react';
 
 const CONCEPTS = [
-  { id: 'focus', name: 'FOCUS', bg: 'https://images.unsplash.com/photo-1507133750040-4a8f57021571?q=80&w=2000', sound: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3', desc: '집중 모드: 25분간 한 가지 일에만 몰입합니다.' },
+  { id: 'focus', name: 'FOCUS', bg: 'https://images.unsplash.com/photo-1507133750040-4a8f57021571?q=80&w=2000', sound: 'https://cdn.pixabay.com/audio/2022/05/27/audio_180873748b.mp3', desc: '집중 모드: 25분간 한 가지 일에만 몰입합니다.' },
   { id: 'social', name: 'SOCIAL', bg: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=2047', sound: 'https://www.soundjay.com/misc/sounds/coffee-shop-1.mp3', desc: '소셜 모드: 사람들의 백색 소음이 창의력을 돕습니다.' },
   { id: 'window', name: 'WINDOW', bg: 'https://images.unsplash.com/photo-1519608487953-e999c86e7455?q=80&w=2070', sound: 'https://www.soundjay.com/nature/sounds/rain-01.mp3', desc: '윈도우 모드: 창밖 빗소리와 함께 차분하게 작업합니다.' }
 ];
@@ -16,30 +16,16 @@ export default function Home() {
   const [mode, setMode] = useState('WORK');
   const [session, setSession] = useState(1);
   const [currentSound, setCurrentSound] = useState<string | null>(null);
-  const [isAudioLoading, setIsAudioLoading] = useState(false);
-  const [todos, setTodos] = useState<{id: number, text: string, done: boolean}[]>([]);
-  const [newTodo, setNewTodo] = useState("");
   const [showInfo, setShowInfo] = useState(false);
 
-  const audios = useRef<Record<string, HTMLAudioElement>>({});
+  // 단 하나의 오디오 객체로 관리 (가장 에러가 적은 방식)
+  const mainAudio = useRef<HTMLAudioElement | null>(null);
 
-  // 1. 첫 클릭 시 소리 엔진 깨우기 (마스터 키)
-  const handleStartApp = () => {
-    CONCEPTS.forEach(c => {
-      const audio = new Audio(c.sound);
-      audio.loop = true;
-      audio.volume = 0.5;
-      // 브라우저 권한을 얻기 위해 무음으로 살짝 재생
-      audio.play().then(() => {
-        audio.pause();
-        audio.currentTime = 0;
-      }).catch(e => console.log("Unlock error:", e));
-      audios.current[c.id] = audio;
-    });
-    setHasStarted(true);
-  };
+  useEffect(() => {
+    mainAudio.current = new Audio();
+    mainAudio.current.loop = true;
+  }, []);
 
-  // 2. 타이머 로직
   useEffect(() => {
     let interval: any;
     if (isActive && timeLeft > 0) {
@@ -61,40 +47,51 @@ export default function Home() {
     }
   };
 
-  // 3. 소리 재생 (로딩 상태 추가)
-  const toggleSound = async (type: string) => {
-    const target = audios.current[type];
-    if (!target) return;
+  // 소리 재생 로직 (즉각 재생 방식)
+  const toggleSound = (type: string) => {
+    if (!mainAudio.current) return;
 
     if (currentSound === type) {
-      target.pause();
+      mainAudio.current.pause();
       setCurrentSound(null);
     } else {
-      setIsAudioLoading(true);
-      // 기존 소리 모두 끄기
-      Object.values(audios.current).forEach(a => a.pause());
+      // 1. 소리 끄기
+      mainAudio.current.pause();
+      // 2. 새로운 소리 소스 입력
+      const soundUrl = CONCEPTS.find(c => c.id === type)?.sound || "";
+      mainAudio.current.src = soundUrl;
+      // 3. 로드 및 즉시 재생 (가장 중요)
+      mainAudio.current.load();
+      const playPromise = mainAudio.current.play();
       
-      try {
-        await target.play();
-        setCurrentSound(type);
-      } catch (err) {
-        console.error("Play failed", err);
-      } finally {
-        setIsAudioLoading(false);
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          setCurrentSound(type);
+        }).catch(error => {
+          console.error("재생 실패:", error);
+          alert("소리 재생을 위해 화면을 한 번 더 클릭해주세요!");
+        });
       }
     }
   };
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
+  // 시작 화면 (이걸 클릭해야 소리 엔진이 풀립니다)
   if (!hasStarted) {
     return (
-      <div onClick={handleStartApp} style={{ backgroundColor: '#0a0a0a', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', textAlign: 'center' }}>
-        <div style={{ padding: '40px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', marginBottom: '30px', backgroundColor: 'rgba(255,255,255,0.03)' }}>
-          <Play size={50} fill="white" />
+      <div 
+        onClick={() => setHasStarted(true)} 
+        style={{ backgroundColor: '#0a0a0a', color: '#fff', height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+      >
+        <div style={{ padding: '40px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '100px', marginBottom: '30px', animation: 'pulse 2s infinite' }}>
+          <Play size={60} fill="white" />
         </div>
-        <h1 style={{ fontSize: '18px', letterSpacing: '8px', fontWeight: 200, marginBottom: '10px' }}>CAFE POMODORO</h1>
-        <p style={{ opacity: 0.3, fontSize: '11px', letterSpacing: '2px' }}>클릭하여 시스템을 활성화하세요</p>
+        <h1 style={{ fontSize: '20px', letterSpacing: '10px', fontWeight: 200 }}>ENTER CAFE</h1>
+        <p style={{ marginTop: '20px', opacity: 0.3, fontSize: '12px' }}>화면을 클릭하여 소리 권한을 허용하세요</p>
+        <style jsx>{`
+          @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
+        `}</style>
       </div>
     );
   }
@@ -102,22 +99,23 @@ export default function Home() {
   return (
     <div style={{
       backgroundColor: '#0a0a0a', color: '#f5f5f5', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', position: 'relative',
-      backgroundImage: `linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url(${CONCEPTS[conceptIdx].bg})`,
+      backgroundImage: `linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)), url(${CONCEPTS[conceptIdx].bg})`,
       backgroundSize: 'cover', backgroundPosition: 'center', transition: '1s ease'
     }}>
-      {/* 진행 바 */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(249, 115, 22, 0.1)', height: `${(1 - timeLeft / (mode === 'WORK' ? 25*60 : (mode === 'REST' ? 5*60 : 20*60))) * 100}%`, transition: 'height 1s linear' }} />
+      {/* 차오르는 커피 효과 */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(255,255,255,0.05)', height: `${(1 - timeLeft / (mode === 'WORK' ? 25*60 : (mode === 'REST' ? 5*60 : 20*60))) * 100}%`, transition: 'height 1s linear' }} />
 
       <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'row', gap: '40px', maxWidth: '1100px', width: '90%' }} className="main-container">
-        {/* 타이머 구역 */}
-        <div style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(50px)', padding: '60px 40px', borderRadius: '60px', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 50px 100px rgba(0,0,0,0.5)' }}>
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+        
+        {/* 타이머 */}
+        <div style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(50px)', padding: '60px 40px', borderRadius: '60px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
             {[1, 2, 3, 4].map(i => (
-              <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: i <= session ? '#f97316' : 'rgba(255,255,255,0.1)', transition: '0.5s' }} />
+              <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: i <= session ? '#f97316' : 'rgba(255,255,255,0.1)' }} />
             ))}
           </div>
           <div style={{ fontSize: '10px', letterSpacing: '5px', opacity: 0.4, marginBottom: '10px', fontWeight: 'bold' }}>{mode} {session}/4</div>
-          <div style={{ fontSize: '150px', fontWeight: 100, marginBottom: '40px', letterSpacing: '-10px', lineHeight: 1 }}>{formatTime(timeLeft)}</div>
+          <div style={{ fontSize: '160px', fontWeight: 100, marginBottom: '40px', letterSpacing: '-10px', lineHeight: 1 }}>{formatTime(timeLeft)}</div>
           
           <div style={{ display: 'flex', gap: '30px', alignItems: 'center', marginBottom: '60px' }}>
             <button onClick={() => {setTimeLeft(25*60); setIsActive(false);}} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer' }}><RotateCcw size={28}/></button>
@@ -127,35 +125,32 @@ export default function Home() {
             <button onClick={() => setShowInfo(true)} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer' }}><Info size={28}/></button>
           </div>
 
-          <div style={{ display: 'flex', gap: '20px', position: 'relative' }}>
+          <div style={{ display: 'flex', gap: '20px' }}>
             {CONCEPTS.map((c, idx) => (
               <button 
                 key={c.id}
                 onClick={() => {setConceptIdx(idx); toggleSound(c.id);}}
-                disabled={isAudioLoading}
-                style={{ padding: '25px', borderRadius: '35px', border: '1px solid rgba(255,255,255,0.1)', cursor: isAudioLoading ? 'wait' : 'pointer', backgroundColor: currentSound === c.id ? '#fff' : 'rgba(255,255,255,0.03)', color: currentSound === c.id ? '#000' : '#fff', transition: '0.3s' }}
+                style={{ padding: '25px', borderRadius: '35px', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', backgroundColor: currentSound === c.id ? '#fff' : 'rgba(255,255,255,0.03)', color: currentSound === c.id ? '#000' : '#fff', transition: '0.3s' }}
               >
-                {isAudioLoading && currentSound === null && idx === conceptIdx ? <Loader2 className="animate-spin" size={24} /> : (
-                  <>
-                    {c.id === 'focus' && <Coffee size={24} />}
-                    {c.id === 'social' && <Users size={24} />}
-                    {c.id === 'window' && <CloudRain size={24} />}
-                  </>
-                )}
+                {c.id === 'focus' && <Coffee size={24} />}
+                {c.id === 'social' && <Users size={24} />}
+                {c.id === 'window' && <CloudRain size={24} />}
               </button>
             ))}
           </div>
+          {currentSound && <div style={{marginTop: '20px', color: '#f97316', fontSize: '10px', letterSpacing: '2px'}}><Volume2 size={12} style={{display:'inline', marginRight: '5px'}}/>SOUND PLAYING</div>}
         </div>
 
-        {/* 플래너 구역 */}
-        <div style={{ width: '380px', backgroundColor: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(50px)', padding: '40px', borderRadius: '60px', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '30px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '20px' }}>
+        {/* 플래너 */}
+        <div style={{ width: '380px', backgroundColor: 'rgba(255,255,255,0.02)', backdropFilter: 'blur(50px)', padding: '40px', borderRadius: '60px', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '30px', opacity: 0.5 }}>
             <ListTodo color="#f97316" size={20} />
-            <span style={{ fontSize: '18px', fontWeight: 300, letterSpacing: '1px' }}>PLANNER</span>
+            <span style={{ fontSize: '18px', fontWeight: 300 }}>PLANNER</span>
           </div>
+          {/* 할 일 입력창 및 목록 (기존과 동일) */}
           <form onSubmit={(e:any) => { e.preventDefault(); if(!newTodo) return; setTodos([{id: Date.now(), text: newTodo, done: false}, ...todos]); setNewTodo(""); }} style={{ display: 'flex', gap: '10px', marginBottom: '25px' }}>
-            <input value={newTodo} onChange={(e) => setNewTodo(e.target.value)} placeholder="Task..." style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '18px', color: '#fff', outline: 'none' }} />
-            <button style={{ width: '55px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', fontWeight: 'bold' }}>+</button>
+            <input value={newTodo} onChange={(e) => setNewTodo(e.target.value)} placeholder="Add a task..." style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '18px', color: '#fff', outline: 'none' }} />
+            <button style={{ width: '55px', borderRadius: '20px', border: 'none', backgroundColor: '#fff', fontWeight: 'bold', cursor: 'pointer' }}>+</button>
           </form>
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {todos.map(todo => (
@@ -170,28 +165,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-      {showInfo && (
-        <div style={{ position: 'absolute', zIndex: 100, backgroundColor: 'rgba(0,0,0,0.95)', backdropFilter: 'blur(40px)', padding: '40px', borderRadius: '40px', border: '1px solid rgba(255,255,255,0.2)', maxWidth: '350px', textAlign: 'center' }}>
-          <h3 style={{ color: '#f97316', marginBottom: '20px' }}>POMODORO GUIDE</h3>
-          <p style={{ fontSize: '13px', lineHeight: '1.8', opacity: 0.7, textAlign: 'left' }}>
-            25분 집중과 5분 휴식을 반복합니다.<br/>
-            4번의 집중 세션이 끝나면 20분의 긴 휴식이 시작됩니다.<br/><br/>
-            <strong>{CONCEPTS[conceptIdx].name} MODE:</strong><br/>
-            {CONCEPTS[conceptIdx].desc}
-          </p>
-          <button onClick={() => setShowInfo(false)} style={{ marginTop: '30px', padding: '12px 40px', borderRadius: '25px', border: 'none', backgroundColor: '#fff', fontWeight: 'bold', width: '100%' }}>GOT IT</button>
-        </div>
-      )}
-
-      <style jsx global>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .animate-spin { animation: spin 1s linear infinite; }
-        @media (max-width: 1000px) {
-          .main-container { flex-direction: column !important; align-items: center !important; }
-          .main-container > div { width: 100% !important; }
-        }
-      `}</style>
     </div>
   );
 }
